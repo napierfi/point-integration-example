@@ -1,33 +1,55 @@
 import fs from 'fs';
-import { getPriceDataMap } from './contract';
 import { getMarketDetails, getUserWithBalancesForTokens } from './subgraph';
+import {
+  getLpUnderlyingMap,
+  getYtTotalSupplyMap,
+  getYtUnderlyingMap,
+} from './contract';
+import { getLpTotalSupplyMap } from './contract';
+import { BigNumber } from 'bignumber.js';
 
 // CONFIGURABLE
-const markets = ['0xaf2391b932d439138641be3ee879b0c853d6e566'];
+const markets = ['0x8eb9f9e97d6a63aab7572ad0d96fa3f09255cce9'];
 const chainId = 1;
-const blockNumber = 22028602;
+const blockNumber = 22160745;
 
 async function main() {
   const marketDetails = await getMarketDetails(chainId, markets, blockNumber);
-  const priceDataMap = await getPriceDataMap(
-    chainId,
-    marketDetails,
-    blockNumber,
-  );
 
   const userWithBalances = await getUserWithBalancesForTokens(
     chainId,
-    marketDetails.flatMap((md) => [md.lpAddress, md.ytAddress]),
+    marketDetails.flatMap((md) => [md.ytAddress, md.lpAddress]),
     blockNumber,
   );
 
-  const WAD = 10n ** 18n;
+  const [lpTotalSupplyMap, ytTotalSupplyMap, lpUnderlyingMap, ytUnderlyingMap] =
+    await Promise.all([
+      getLpTotalSupplyMap(chainId, marketDetails, blockNumber),
+      getYtTotalSupplyMap(chainId, marketDetails, blockNumber),
+      getLpUnderlyingMap(chainId, marketDetails, blockNumber),
+      getYtUnderlyingMap(chainId, marketDetails, blockNumber),
+    ]);
+
   const userWithBalancesInShareMap = userWithBalances.reduce(
     (acc, userWithBalance) => {
-      const price = priceDataMap[userWithBalance.tokenAddress];
+      let totalSupply = 1n;
+      let totalUnderlying = 0n;
+
+      if (userWithBalance.type === 'LP') {
+        totalSupply = lpTotalSupplyMap[userWithBalance.tokenAddress];
+      } else if (userWithBalance.type === 'YT') {
+        totalSupply = ytTotalSupplyMap[userWithBalance.tokenAddress];
+      }
+
+      if (userWithBalance.type === 'LP') {
+        totalUnderlying = lpUnderlyingMap[userWithBalance.tokenAddress];
+      } else if (userWithBalance.type === 'YT') {
+        totalUnderlying = ytUnderlyingMap[userWithBalance.tokenAddress];
+      }
+
       const balance = userWithBalance.balance;
-      const balanceInShare = (balance * price) / WAD;
-      acc[userWithBalance.accountAddress] = balanceInShare;
+      const balanceInUnderlying = (balance * totalUnderlying) / totalSupply;
+      acc[userWithBalance.accountAddress] = balanceInUnderlying;
       return acc;
     },
     {} as Record<string, bigint>,

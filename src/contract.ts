@@ -1,4 +1,4 @@
-import { createPublicClient, http } from 'viem';
+import { Address, createPublicClient, erc20Abi, http } from 'viem';
 import {
   arbitrum,
   avalanche,
@@ -12,9 +12,8 @@ import {
   sonic,
 } from 'viem/chains';
 import { MarketDetails } from './subgraph';
-import { LENS_ABI } from './abi';
 
-export async function getPriceDataMap(
+export async function getYtTotalSupplyMap(
   chainId: keyof typeof chainIdToChain,
   marketDetails: MarketDetails[],
   blockNumber: number,
@@ -24,25 +23,108 @@ export async function getPriceDataMap(
     transport: http(),
   });
 
-  const priceData = (await client.multicall({
-    blockNumber: BigInt(blockNumber),
-    contracts: marketDetails.map(
-      (marketDetail) =>
-        ({
-          address: '0x0000006178ee874e0ae58b131b8a5fcbe78cab2f',
-          abi: LENS_ABI,
-          functionName: 'getPriceData',
-          args: [marketDetail.lpAddress],
-        }) as const,
-    ),
+  const totalSupplies = (await client.multicall({
     allowFailure: false,
-  })) as PriceData[];
+    blockNumber: BigInt(blockNumber),
+    contracts: marketDetails.map((marketDetail) => ({
+      address: marketDetail.ytAddress as Address,
+      abi: erc20Abi,
+      functionName: 'totalSupply',
+    })),
+  })) as bigint[];
 
-  return priceData.reduce(
-    (acc, pd, index) => {
-      acc[marketDetails[index].ptAddress] = pd.ptPriceInShare;
-      acc[marketDetails[index].lpAddress] = pd.lpPriceInShare;
-      acc[marketDetails[index].ytAddress] = pd.ytPriceInShare;
+  return marketDetails.reduce(
+    (acc, marketDetail, i) => {
+      acc[marketDetail.ytAddress] = totalSupplies[i];
+      return acc;
+    },
+    {} as Record<string, bigint>,
+  );
+}
+
+export async function getYtUnderlyingMap(
+  chainId: keyof typeof chainIdToChain,
+  marketDetails: MarketDetails[],
+  blockNumber: number,
+) {
+  const client = createPublicClient({
+    chain: chainIdToChain[chainId],
+    transport: http(),
+  });
+
+  const underlyingAmounts = (await client.multicall({
+    allowFailure: false,
+    blockNumber: BigInt(blockNumber),
+    contracts: marketDetails.map((marketDetail) => ({
+      address: marketDetail.underlyingAddress as Address,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [marketDetail.ptAddress],
+    })),
+  })) as bigint[];
+
+  return marketDetails.reduce(
+    (acc, marketDetail, i) => {
+      acc[marketDetail.ytAddress] = underlyingAmounts[i];
+      return acc;
+    },
+    {} as Record<string, bigint>,
+  );
+}
+
+export async function getLpTotalSupplyMap(
+  chainId: keyof typeof chainIdToChain,
+  marketDetails: MarketDetails[],
+  blockNumber: number,
+) {
+  const client = createPublicClient({
+    chain: chainIdToChain[chainId],
+    transport: http(),
+  });
+
+  const totalSupplies = (await client.multicall({
+    allowFailure: false,
+    blockNumber: BigInt(blockNumber),
+    contracts: marketDetails.map((marketDetail) => ({
+      address: marketDetail.lpAddress as Address,
+      abi: erc20Abi,
+      functionName: 'totalSupply',
+    })),
+  })) as bigint[];
+
+  return marketDetails.reduce(
+    (acc, marketDetail, i) => {
+      acc[marketDetail.lpAddress] = totalSupplies[i];
+      return acc;
+    },
+    {} as Record<string, bigint>,
+  );
+}
+
+export async function getLpUnderlyingMap(
+  chainId: keyof typeof chainIdToChain,
+  marketDetails: MarketDetails[],
+  blockNumber: number,
+) {
+  const client = createPublicClient({
+    chain: chainIdToChain[chainId],
+    transport: http(),
+  });
+
+  const underlyingAmounts = (await client.multicall({
+    allowFailure: false,
+    blockNumber: BigInt(blockNumber),
+    contracts: marketDetails.map((marketDetail) => ({
+      address: marketDetail.underlyingAddress as Address,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [marketDetail.lpAddress],
+    })),
+  })) as bigint[];
+
+  return marketDetails.reduce(
+    (acc, marketDetail, i) => {
+      acc[marketDetail.lpAddress] = underlyingAmounts[i];
       return acc;
     },
     {} as Record<string, bigint>,

@@ -15,6 +15,9 @@ export async function getMarketDetails(
         yieldToken {
           id
         }
+        targetToken {
+          id
+        }
         pool {
           poolToken {
             id
@@ -30,6 +33,7 @@ export async function getMarketDetails(
       ptAddress: principal.id,
       ytAddress: principal.yieldToken.id,
       lpAddress: principal.pool.poolToken.id,
+      underlyingAddress: principal.targetToken.id,
     };
   });
 }
@@ -38,6 +42,7 @@ export type MarketDetails = {
   ptAddress: string;
   ytAddress: string;
   lpAddress: string;
+  underlyingAddress: string;
 };
 
 export async function getUserWithBalancesForTokens(
@@ -51,10 +56,13 @@ export async function getUserWithBalancesForTokens(
       accountTokens(
         where: { token_in: $tokens, balance_gt: 0 }
         block: { number: $blockNumber }
+        first: 1000
+        skip: 0
       ) {
         id
         token {
           id
+          type
         }
         account {
           id
@@ -69,6 +77,7 @@ export async function getUserWithBalancesForTokens(
       tokenAddress: accountToken.token.id,
       accountAddress: accountToken.account.id,
       balance: BigInt(accountToken.balance),
+      type: accountToken.token.type as TokenType,
     };
   });
 }
@@ -77,4 +86,7 @@ export type UserBalance = {
   tokenAddress: string;
   accountAddress: string;
   balance: bigint;
+  type: TokenType;
 };
+
+type TokenType = 'PT' | 'YT' | 'LP' | 'TARGET' | 'UNKNOWN';
