@@ -26,39 +26,48 @@ async function main() {
       getYtUnderlyingMap(chainId, marketDetails, blockNumber),
     ]);
 
-  const userWithBalancesInShareMap = userWithBalances.reduce(
-    (acc, userWithBalance) => {
-      let totalSupply = 1n;
-      let totalUnderlying = 0n;
+  const userBalancesInShareLp = userWithBalances
+    .filter((userWithBalance) => userWithBalance.type === 'LP')
+    .reduce(
+      (acc, userWithBalance) => {
+        const totalSupply = lpTotalSupplyMap[userWithBalance.tokenAddress];
+        const totalUnderlying = lpUnderlyingMap[userWithBalance.tokenAddress];
+        const balance = userWithBalance.balance;
+        const balanceInUnderlying = (balance * totalUnderlying) / totalSupply;
+        acc[userWithBalance.accountAddress] = balanceInUnderlying;
+        return acc;
+      },
+      {} as Record<string, bigint>,
+    );
 
-      if (userWithBalance.type === 'LP') {
-        totalSupply = lpTotalSupplyMap[userWithBalance.tokenAddress];
-      } else if (userWithBalance.type === 'YT') {
-        totalSupply = ytTotalSupplyMap[userWithBalance.tokenAddress];
-      }
-
-      if (userWithBalance.type === 'LP') {
-        totalUnderlying = lpUnderlyingMap[userWithBalance.tokenAddress];
-      } else if (userWithBalance.type === 'YT') {
-        totalUnderlying = ytUnderlyingMap[userWithBalance.tokenAddress];
-      }
-
-      const balance = userWithBalance.balance;
-      const balanceInUnderlying = (balance * totalUnderlying) / totalSupply;
-      acc[userWithBalance.accountAddress] = balanceInUnderlying;
-      return acc;
-    },
-    {} as Record<string, bigint>,
-  );
+  const userBalancesInShareYt = userWithBalances
+    .filter((userWithBalance) => userWithBalance.type === 'YT')
+    .reduce(
+      (acc, userWithBalance) => {
+        const totalSupply = ytTotalSupplyMap[userWithBalance.tokenAddress];
+        const totalUnderlying = ytUnderlyingMap[userWithBalance.tokenAddress];
+        const balance = userWithBalance.balance;
+        const balanceInUnderlying = (balance * totalUnderlying) / totalSupply;
+        acc[userWithBalance.accountAddress] = balanceInUnderlying;
+        return acc;
+      },
+      {} as Record<string, bigint>,
+    );
 
   // Export to CSV
-  const csvContent = Object.entries(userWithBalancesInShareMap)
+  const csvContentLp = Object.entries(userBalancesInShareLp)
     .map(([address, balance]) => `${address},${balance}`)
     .join('\n');
+  const headerLp = 'address,balance\n';
+  fs.writeFileSync('user_balances_lp.csv', headerLp + csvContentLp);
+  console.log('Exported user balances to user_balances_lp.csv');
 
-  const header = 'address,balance\n';
-  fs.writeFileSync('user_balances.csv', header + csvContent);
-  console.log('Exported user balances to user_balances.csv');
+  const csvContentYt = Object.entries(userBalancesInShareYt)
+    .map(([address, balance]) => `${address},${balance}`)
+    .join('\n');
+  const headerYt = 'address,balance\n';
+  fs.writeFileSync('user_balances_yt.csv', headerYt + csvContentYt);
+  console.log('Exported user balances to user_balances_yt.csv');
 }
 
 main()
