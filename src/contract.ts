@@ -14,12 +14,12 @@ import {
 import { MarketDetails } from './subgraph';
 
 export async function getYtTotalSupplyMap(
-  chainId: keyof typeof chainIdToChain,
+  chainId: number,
   marketDetails: MarketDetails[],
   blockNumber: number,
 ) {
   const client = createPublicClient({
-    chain: chainIdToChain[chainId],
+    chain: getChainIdToChain(chainId),
     transport: http(),
   });
 
@@ -43,12 +43,12 @@ export async function getYtTotalSupplyMap(
 }
 
 export async function getYtUnderlyingMap(
-  chainId: keyof typeof chainIdToChain,
+  chainId: number,
   marketDetails: MarketDetails[],
   blockNumber: number,
 ) {
   const client = createPublicClient({
-    chain: chainIdToChain[chainId],
+    chain: getChainIdToChain(chainId),
     transport: http(),
   });
 
@@ -73,12 +73,12 @@ export async function getYtUnderlyingMap(
 }
 
 export async function getLpTotalSupplyMap(
-  chainId: keyof typeof chainIdToChain,
+  chainId: number,
   marketDetails: MarketDetails[],
   blockNumber: number,
 ) {
   const client = createPublicClient({
-    chain: chainIdToChain[chainId],
+    chain: getChainIdToChain(chainId),
     transport: http(),
   });
 
@@ -102,12 +102,12 @@ export async function getLpTotalSupplyMap(
 }
 
 export async function getLpUnderlyingMap(
-  chainId: keyof typeof chainIdToChain,
+  chainId: number,
   marketDetails: MarketDetails[],
   blockNumber: number,
 ) {
   const client = createPublicClient({
-    chain: chainIdToChain[chainId],
+    chain: getChainIdToChain(chainId),
     transport: http(),
   });
 
@@ -129,6 +129,13 @@ export async function getLpUnderlyingMap(
     },
     {} as Record<string, bigint>,
   );
+}
+
+export function getChainIdToChain(chainId: number) {
+  if (chainId in chainIdToChain) {
+    return chainIdToChain[chainId as ChainId];
+  }
+  throw new Error(`Chain ID ${chainId} not found`);
 }
 
 const chainIdToChain = {

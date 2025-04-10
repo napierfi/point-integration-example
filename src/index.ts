@@ -7,13 +7,9 @@ import {
 } from './contract';
 import { getLpTotalSupplyMap } from './contract';
 import { BigNumber } from 'bignumber.js';
-
-// CONFIGURABLE
-const markets = ['0x8eb9f9e97d6a63aab7572ad0d96fa3f09255cce9'];
-const chainId = 1;
-const blockNumber = 22160745;
-
+import { configuration } from './configuration';
 async function main() {
+  const { chainId, markets, blockNumber } = configuration;
   const marketDetails = await getMarketDetails(chainId, markets, blockNumber);
 
   const userWithBalances = await getUserWithBalancesForTokens(
