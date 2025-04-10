@@ -32,7 +32,7 @@ pnpm install
 
 ### Configuration
 
-Edit the configuration variables in `src/index.ts` to set:
+Edit the configuration variables in `src/configuration.ts` to set:
 
 - `markets`: Array of Napier market addresses to track
 - `chainId`: The blockchain network ID
