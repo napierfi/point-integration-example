@@ -20,7 +20,7 @@ export async function getMarketDetails(
             block: { number: $blockNumber }` : '';
 
     const blockVariable = withBlock ? `
-        query getMarketDetails($markets: [ID!], $blockNumber: BigInt) {` : `
+        query getMarketDetails($markets: [ID!], $blockNumber: Int!) {` : `
         query getMarketDetails($markets: [ID!]) {`;
 
     return gql`
@@ -82,7 +82,7 @@ export async function getUserWithBalancesForTokens(
         block: { number: $blockNumber }` : '';
 
     const blockVariable = withBlock ? `
-        query getUserWithBalancesForTokens($tokens: [String], $blockNumber: BigInt!) {` : `
+        query getUserWithBalancesForTokens($tokens: [String], $blockNumber: Int!) {` : `
         query getUserWithBalancesForTokens($tokens: [String]) {`;
 
     return gql`
