@@ -75,32 +75,59 @@ export async function getUserWithBalancesForTokens(
   _blockNumber: number | undefined,
 ): Promise<UserBalance[]> {
   const url = `${baseUrl}/${chainId}`;
-  const query = gql`
-    query getUserWithBalancesForTokens($tokens: [String]) {
-      accountTokens(
-        where: { token_in: $tokens, balance_gt: 0 }
-        first: 1000
-        skip: 0
-      ) {
-        id
-        token {
-          id
-          type
+
+  // Build dynamic query with optional block filter
+  const buildQuery = (withBlock: boolean) => {
+    const blockFilter = withBlock ? `
+        block: { number: $blockNumber }` : '';
+
+    const blockVariable = withBlock ? `
+        query getUserWithBalancesForTokens($tokens: [String], $blockNumber: BigInt!) {` : `
+        query getUserWithBalancesForTokens($tokens: [String]) {`;
+
+    return gql`
+        ${blockVariable}
+          accountTokens(
+            where: { token_in: $tokens, balance_gt: 0 }
+            first: 1000
+            skip: 0
+            ${blockFilter}
+          ) {
+            id
+            token {
+              id
+              type
+            }
+            account {
+              id
+            }
+            balance
+          }
         }
-        account {
-          id
-        }
-        balance
-      }
-    }
-  `;
-  const data: any = await request(url, query, { tokens });
-  return data.accountTokens.map((accountToken: any) => ({
-    tokenAddress: accountToken.token.id,
-    accountAddress: accountToken.account.id,
-    balance: BigInt(accountToken.balance),
-    type: accountToken.token.type,
-  }));
+      `;
+  };
+
+  if (_blockNumber) {
+    // Use block filter when blockNumber is provided
+    const queryWithBlock = buildQuery(true);
+    const data: any = await request(url, queryWithBlock, { tokens, blockNumber: _blockNumber });
+    return data.accountTokens.map((accountToken: any) => ({
+      tokenAddress: accountToken.token.id,
+      accountAddress: accountToken.account.id,
+      balance: BigInt(accountToken.balance),
+      type: accountToken.token.type,
+    }));
+  } else {
+    // Use latest data when no blockNumber
+    const latestQuery = buildQuery(false);
+    const data: any = await request(url, latestQuery, { tokens });
+    return data.accountTokens.map((accountToken: any) => ({
+      tokenAddress: accountToken.token.id,
+      accountAddress: accountToken.account.id,
+      balance: BigInt(accountToken.balance),
+      type: accountToken.token.type,
+    }));
+  }
 }
 
 // Types
