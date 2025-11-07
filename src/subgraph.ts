@@ -1,61 +1,84 @@
+import { config } from 'dotenv';
 import request, { gql } from 'graphql-request';
-
-const baseApiUrl = `https://api-v2.napier.finance/v1/subgraph/napier-v2`;
+import { baseUrl, isDev } from './constant';
+config();
 
 export async function getMarketDetails(
   chainId: number,
   markets: string[],
-  blockNumber: number,
+  _blockNumber: number | undefined,
 ): Promise<MarketDetails[]> {
-  const url = `${baseApiUrl}/${chainId}`;
-  const query = gql`
-    query getMarketDetails($markets: [ID!], $blockNumber: Int!) {
-      principals(where: { id_in: $markets }, block: { number: $blockNumber }) {
-        id
-        yieldToken {
-          id
-        }
-        targetToken {
-          id
-        }
-        pool {
-          poolToken {
+  const url = `${baseUrl}/${chainId}`;
+
+  // Build dynamic query based on environment and blockNumber
+  const buildQuery = (withBlock: boolean) => {
+    const devFields = isDev ? `
+              poolId
+              poolType` : '';
+
+    const blockFilter = withBlock ? `
+            block: { number: $blockNumber }` : '';
+
+    const blockVariable = withBlock ? `
+        query getMarketDetails($markets: [ID!], $blockNumber: BigInt) {` : `
+        query getMarketDetails($markets: [ID!]) {`;
+
+    return gql`
+        ${blockVariable}
+          principals(
+            where: { id_in: $markets }
+            ${blockFilter}
+          ) {
             id
+            yieldToken {
+              id
+            }
+            targetToken {
+              id
+            }
+            pool {
+              id
+              ${devFields}
+              poolToken {
+                id
+              }
+            }
           }
         }
-      }
-    }
-  `;
+      `;
+  };
 
-  const data: any = await request(url, query, { markets, blockNumber });
-  return data.principals.map((principal: any) => {
-    return {
-      ptAddress: principal.id,
-      ytAddress: principal.yieldToken.id,
-      lpAddress: principal.pool.poolToken.id,
-      underlyingAddress: principal.targetToken.id,
-    };
-  });
+  let data: any;
+  if (_blockNumber) {
+    // Use block filter when blockNumber is provided (works for both dev and prod)
+    const queryWithBlock = buildQuery(true);
+    data = await request(url, queryWithBlock, { markets, blockNumber: _blockNumber });
+  } else {
+    // Use latest data when no blockNumber (works for both dev and prod)
+    const latestQuery = buildQuery(false);
+    data = await request(url, latestQuery, { markets });
+  }
+  return data.principals.map((principal: any) => ({
+    ptAddress: principal.id,
+    ytAddress: principal.yieldToken.id,
+    lpAddress: principal.pool.poolToken.id,
+    poolAddress: principal.pool.id,
+    underlyingAddress: principal.targetToken.id,
+    poolType: principal.pool.poolType || 'CURVE_TWO_CRYPTO', // Default for production
+    poolId: principal.pool.poolId, // Only available in dev subgraph
+  }));
 }
-
-export type MarketDetails = {
-  ptAddress: string;
-  ytAddress: string;
-  lpAddress: string;
-  underlyingAddress: string;
-};
 
 export async function getUserWithBalancesForTokens(
   chainId: number,
   tokens: string[],
-  blockNumber: number,
+  _blockNumber: number | undefined,
 ): Promise<UserBalance[]> {
-  const url = `${baseApiUrl}/${chainId}`;
+  const url = `${baseUrl}/${chainId}`;
   const query = gql`
-    query getUserWithBalancesForTokens($tokens: [ID!], $blockNumber: Int!) {
+    query getUserWithBalancesForTokens($tokens: [String]) {
       accountTokens(
         where: { token_in: $tokens, balance_gt: 0 }
-        block: { number: $blockNumber }
         first: 1000
         skip: 0
       ) {
@@ -71,22 +94,31 @@ export async function getUserWithBalancesForTokens(
       }
     }
   `;
-  const data: any = await request(url, query, { tokens, blockNumber });
-  return data.accountTokens.map((accountToken: any) => {
-    return {
-      tokenAddress: accountToken.token.id,
-      accountAddress: accountToken.account.id,
-      balance: BigInt(accountToken.balance),
-      type: accountToken.token.type as TokenType,
-    };
-  });
+  const data: any = await request(url, query, { tokens });
+  return data.accountTokens.map((accountToken: any) => ({
+    tokenAddress: accountToken.token.id,
+    accountAddress: accountToken.account.id,
+    balance: BigInt(accountToken.balance),
+    type: accountToken.token.type,
+  }));
 }
+
+// Types
+export type PoolType = 'CURVE_TWO_CRYPTO' | 'TOKI_HOOK';
+
+export type MarketDetails = {
+  ptAddress: string;
+  ytAddress: string;
+  lpAddress: string;
+  poolAddress: string;
+  underlyingAddress: string;
+  poolType: PoolType;
+  poolId?: string; // Only for TOKI_HOOK pools
+};
 
 export type UserBalance = {
   tokenAddress: string;
   accountAddress: string;
   balance: bigint;
-  type: TokenType;
+  type: 'PT' | 'YT' | 'LP' | 'TARGET' | 'UNKNOWN';
 };
-
-type TokenType = 'PT' | 'YT' | 'LP' | 'TARGET' | 'UNKNOWN';
