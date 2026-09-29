@@ -19,7 +19,7 @@ import { TOKI_HOOK_ABI, TOKI_POOL_TOKEN_ABI } from './abi';
 import { config } from './constant';
 
 const getClient = (chainId: number) => {
-  const transport = config.isDev ? http(config.rpcUrl) : http();
+  const transport = http(config.rpcUrl);
 
   return createPublicClient({
     chain: getChainIdToChain(chainId),
