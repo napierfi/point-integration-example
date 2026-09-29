@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 import request, { gql } from 'graphql-request';
-import { baseUrl, isDev } from './constant';
+import { baseUrl } from './constant';
 config();
 
 export async function getMarketDetails(
@@ -12,9 +12,6 @@ export async function getMarketDetails(
 
   // Build dynamic query based on environment and blockNumber
   const buildQuery = (withBlock: boolean) => {
-    const devFields = isDev ? `
-              poolId
-              poolType` : '';
 
     const blockFilter = withBlock ? `
             block: { number: $blockNumber }` : '';
@@ -38,7 +35,8 @@ export async function getMarketDetails(
             }
             pool {
               id
-              ${devFields}
+              poolId
+              poolType
               poolToken {
                 id
               }
@@ -58,15 +56,23 @@ export async function getMarketDetails(
     const latestQuery = buildQuery(false);
     data = await request(url, latestQuery, { markets });
   }
-  return data.principals.map((principal: any) => ({
+  return data.principals.map((principal: any) => {
+    // Never guess the pool type. Defaulting to Curve sent every TokiHook pool down
+    // the Curve path, which reads balances from the pool token (always 0 for
+    // TokiHook) and silently dropped every LP holder from the output.
+    if (!principal.pool.poolType) {
+      throw new Error(`Subgraph returned no poolType for market ${principal.id}`);
+    }
+    return {
     ptAddress: principal.id,
     ytAddress: principal.yieldToken.id,
     lpAddress: principal.pool.poolToken.id,
     poolAddress: principal.pool.id,
     underlyingAddress: principal.targetToken.id,
-    poolType: principal.pool.poolType || 'CURVE_TWO_CRYPTO', // Default for production
-    poolId: principal.pool.poolId, // Only available in dev subgraph
-  }));
+    poolType: principal.pool.poolType,
+    poolId: principal.pool.poolId,
+    };
+  });
 }
 
 export async function getUserWithBalancesForTokens(

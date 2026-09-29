@@ -60,8 +60,11 @@ async function main() {
 
   // Export results
   exportCsv(userShares.yt, 'user_balances_yt.csv', 'YT');
-  exportCsv(userShares.lpNonPt, 'user_balances_lp_non_pt.csv', 'LP Non-PT');
-  exportCsv(userShares.lpFull, 'user_balances_lp.csv', 'LP Full');
+  // user_balances_lp.csv is the LP NON-PT exposure, as the partner docs state.
+  // Full LP also counts the pool's PT, whose underlying is already credited to YT
+  // holders, so it is written separately and must not be summed with the YT file.
+  exportCsv(userShares.lpNonPt, 'user_balances_lp.csv', 'LP Non-PT');
+  exportCsv(userShares.lpFull, 'user_balances_lp_full.csv', 'LP Full');
 
   console.log('\n✅ Complete!');
   console.log(`   Markets: ${validPools.length} | YT Records: ${Object.keys(userShares.yt).length} | LP Records: ${Object.keys(userShares.lpFull).length}`);

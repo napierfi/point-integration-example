@@ -69,7 +69,9 @@ RPC_URL=https://your-tenderly-rpc-url
 BACKEND_URL=https://api-dev.napier.finance/v1/subgraph/napier-v2
 ```
 
-For production, omit `.env` file or set `NODE_ENV=production`.
+For production, omit `.env` file or set `NODE_ENV=production`. Setting `RPC_URL` is
+recommended in production too: without it the script uses viem's public default
+endpoint, which rate-limits.
 
 ### Running the Script
 
@@ -80,8 +82,16 @@ pnpm ts src/index.ts
 
 This generates three CSV files:
 - `user_balances_yt.csv` - YT exposures
-- `user_balances_lp_non_pt.csv` - LP non-PT exposures
-- `user_balances_lp.csv` - LP full exposures
+- `user_balances_lp.csv` - LP exposures, **non-PT portion**
+- `user_balances_lp_full.csv` - LP exposures including the pool's PT
+
+Use `user_balances_yt.csv` + `user_balances_lp.csv` for crediting. Do **not** add
+`user_balances_lp_full.csv` to the YT file: the underlying behind the pool's PT is
+already credited to YT holders, so the two overlap.
+
+For Uniswap V4 (TokiHook) pools, LP exposure includes underlying the hook has
+rehypothecated into an external vault. That vault, not the pool, is the on-chain
+holder of those tokens, so exclude it from any direct-holder crediting.
 
 ## Output Format
 
